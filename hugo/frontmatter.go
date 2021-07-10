@@ -1,4 +1,4 @@
-package hugov0492
+package hugo
 
 import (
 	"bytes"
