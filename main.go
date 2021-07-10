@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/gohugoio/hugo/config"
-	"github.com/n0x1m/hugoext/hugov0492"
+	"github.com/n0x1m/hugoext/hugo"
 	"github.com/spf13/afero"
 )
 
@@ -41,6 +41,8 @@ func main() {
 	flag.BoolVar(&noSectionList, "no-section-list", false, "disable auto append of section content lists")
 	flag.BoolVar(&withDrafts, "enable-withDrafts", false, "include withDrafts in processing and output")
 	flag.Parse()
+
+	fmt.Printf("converting markdown to %v with %v\n", ext, processor)
 
 	osfs := afero.NewOsFs()
 	cfg, err := config.FromFile(osfs, "config.toml")
@@ -172,14 +174,14 @@ type File struct {
 	NewBody []byte
 }
 
-func parse(fullpath string) ([]byte, *hugov0492.Content, error) {
+func parse(fullpath string) ([]byte, *hugo.Content, error) {
 	file, err := os.Open(fullpath)
 	if err != nil {
 		return nil, nil, err
 	}
 	defer file.Close()
 
-	page, err := hugov0492.ReadFrom(file)
+	page, err := hugo.ReadFrom(file)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -205,7 +207,7 @@ func destinationPath(file *File, pattern string) error {
 	file.Draft = c.Draft
 
 	if file.Parent != "." {
-		link, err := hugov0492.PathPattern(pattern).Expand(c)
+		link, err := hugo.PathPattern(pattern).Expand(c)
 		if err != nil {
 			return err
 		}
@@ -250,8 +252,8 @@ func collectFiles(fullpath string, filechan chan File) error {
 		})
 }
 
-func NewContentFromMeta(meta map[string]interface{}) *hugov0492.Content {
-	return &hugov0492.Content{
+func NewContentFromMeta(meta map[string]interface{}) *hugo.Content {
+	return &hugo.Content{
 		Title:      stringFromInterface(meta["title"]),
 		Slug:       stringFromInterface(meta["slug"]),
 		Summary:    stringFromInterface(meta["summary"]),
