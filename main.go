@@ -29,15 +29,17 @@ const (
 )
 
 func main() {
-	var ext, processor, source, destination, cfgpath string
-	var uglyurls bool
+	var ext, processor, source, destination, cfgPath string
+	var uglyURLs, noSectionList, withDrafts bool
 
 	flag.StringVar(&ext, "ext", defaultExt, "ext to look for templates in ./layout")
 	flag.StringVar(&processor, "proc", defaultProcessor, "processor to pipe markdown content through")
 	flag.StringVar(&source, "source", defaultSource, "source directory")
 	flag.StringVar(&destination, "destination", defaultDestination, "output directory")
-	flag.StringVar(&cfgpath, "config", defaultConfigPath, "hugo config path")
-	flag.BoolVar(&uglyurls, "ugly-urls", defaultUglyURLs, "use directories with index or .ext files")
+	flag.StringVar(&cfgPath, "config", defaultConfigPath, "hugo config path")
+	flag.BoolVar(&uglyURLs, "ugly-urls", false, "use directories with index or .ext files")
+	flag.BoolVar(&noSectionList, "no-section-list", false, "disable auto append of section content lists")
+	flag.BoolVar(&withDrafts, "enable-withDrafts", false, "include withDrafts in processing and output")
 	flag.Parse()
 
 	osfs := afero.NewOsFs()
@@ -51,7 +53,6 @@ func main() {
 		log.Println("no permalinks from config loaded, using default: ", defaultPermalinkFormat)
 	}
 
-	// test
 	linkpattern := func(subdir string) string {
 		format, ok := permalinks[subdir]
 		if ok {
@@ -74,6 +75,10 @@ func main() {
 			continue
 		}
 		//fmt.Printf("%s -> %s (%d)\n", file.Source, file.Destination, len(file.Body))
+		if file.Draft && !withDrafts {
+			fmt.Printf("skipping draft %s (%dbytes)\n", file.Source, len(file.Body))
+			continue
+		}
 		tree.Files = append(tree.Files, file)
 	}
 
@@ -115,7 +120,7 @@ func main() {
 			}
 			// TODO: change dir^
 			// TODO: consider links
-			if uglyurls {
+			if uglyURLs {
 				outdir += ".gmi"
 				outfile = ""
 			}
@@ -137,6 +142,13 @@ func main() {
 	}
 
 	// TODO
+	// ugly urls
+	//
+	// append section listings
+	// => link title line
+	// date - summary block
+
+	// TODO
 	// check/replace links
 	// write rss?
 	// write listings from template?
@@ -153,6 +165,8 @@ type File struct {
 	Parent      string
 	Name        string
 	Extension   string
+
+	Draft bool
 
 	Body    []byte
 	NewBody []byte
@@ -188,6 +202,7 @@ func destinationPath(file *File, pattern string) error {
 	}
 	c.Filepath = file.Name
 	file.Body = body
+	file.Draft = c.Draft
 
 	if file.Parent != "." {
 		link, err := hugov0492.PathPattern(pattern).Expand(c)
@@ -243,15 +258,18 @@ func NewContentFromMeta(meta map[string]interface{}) *hugov0492.Content {
 		Categories: stringArrayFromInterface(meta["categories"]),
 		Tags:       stringArrayFromInterface(meta["tags"]),
 		Date:       dateFromInterface(meta["date"]),
+		Draft:      boolFromInterface(meta["draft"]),
 	}
 }
 
 func stringFromInterface(input interface{}) string {
-	str, ok := input.(string)
-	if ok {
-		return str
-	}
-	return ""
+	str, _ := input.(string)
+	return str
+}
+
+func boolFromInterface(input interface{}) bool {
+	v, _ := input.(bool)
+	return v
 }
 
 func dateFromInterface(input interface{}) time.Time {

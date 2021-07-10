@@ -16,6 +16,7 @@ type Content struct {
 	Categories []string
 	Tags       []string
 	Date       time.Time
+	Draft      bool
 
 	Filepath  string
 	Subdir    string
