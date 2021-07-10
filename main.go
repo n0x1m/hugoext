@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gohugoio/hugo/config"
@@ -43,32 +44,34 @@ func main() {
 	}
 
 	permalinks := cfg.GetStringMapString("permalinks")
-	fmt.Println("permalinks", permalinks)
+	//fmt.Println("permalinks", permalinks)
 
-	fpath := "content/posts/first-post.md"
-	file, err := os.Open(fpath)
-	if err != nil {
-		log.Fatal("open", err)
-	}
+	/*
+		fpath := "content/posts/first-post.md"
+		file, err := os.Open(fpath)
+		if err != nil {
+			log.Fatal("open", err)
+		}
 
-	page, err := ReadFrom(file)
-	if err != nil {
-		log.Fatal("read page", err)
-	}
+		page, err := ReadFrom(file)
+		if err != nil {
+			log.Fatal("read page", err)
+		}
 
-	fmt.Println(string(page.FrontMatter()))
-	fmt.Println(string(page.Content()))
-	meta, err := page.Metadata()
-	if err != nil {
-		log.Fatal("read meta", err)
-	}
-	c := NewContentFromMeta(meta)
-	fmt.Println(c)
-	link, err := pathPattern(permalinks["posts"]).Expand(c)
-	if err != nil {
-		log.Fatal("permalink expand", err)
-	}
-	fmt.Println(link)
+		fmt.Println(string(page.FrontMatter()))
+		fmt.Println(string(page.Content()))
+		meta, err := page.Metadata()
+		if err != nil {
+			log.Fatal("read meta", err)
+		}
+		c := NewContentFromMeta(meta)
+		fmt.Println(c)
+		link, err := pathPattern(permalinks["posts"]).Expand(c)
+		if err != nil {
+			log.Fatal("permalink expand", err)
+		}
+		fmt.Println(link)
+	*/
 
 	// test
 	linkcfg := func(subdir string) string {
@@ -78,29 +81,82 @@ func main() {
 		}
 		return defaultPermalinkFormat
 	}
-	listDirectory(source, linkcfg)
+
+	files := make(chan File)
+	go collectFiles(source, files)
+	for file := range files {
+		pattern := linkcfg(file.Parent)
+		err := destinationPath(&file, pattern)
+		if err != nil {
+			fmt.Println(err, file)
+			continue
+		}
+		fmt.Printf("%s -> %s (%d)\n", file.Source, file.Destination, len(file.Body))
+	}
+
+	// iterate through file tree source
+	// for each file, get destination path, switch file extension, remove underscore for index
+	// call proc and pipe content through it, catch output of proc and write to destination
+	// replace links?
+	// write rss?
+	// write listings from template?
 }
 
-func parse(fullpath string) (*Content, error) {
+type FileTree struct {
+	Files map[string]*File
+}
+
+type File struct {
+	Root        string
+	Source      string
+	Destination string
+	Parent      string
+	Name        string
+	Extension   string
+
+	Body []byte
+}
+
+func parse(fullpath string) ([]byte, *Content, error) {
 	file, err := os.Open(fullpath)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	page, err := ReadFrom(file)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	meta, err := page.Metadata()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	c := NewContentFromMeta(meta)
-	fmt.Println(c)
-
-	return c, nil
+	return append(page.FrontMatter(), page.Content()...), c, nil
 }
 
-func listDirectory(fullpath string, linkcfg func(string) string) error {
+func destinationPath(file *File, pattern string) error {
+	body, c, err := parse(file.Source)
+	if err != nil {
+		return err
+	}
+	c.Filepath = file.Name
+	file.Body = body
+
+	if file.Parent != "." {
+		link, err := pathPattern(pattern).Expand(c)
+		if err != nil {
+			return err
+		}
+		file.Destination = link
+	} else {
+		file.Destination = strings.TrimLeft(file.Name, "_")
+	}
+
+	return nil
+}
+
+func collectFiles(fullpath string, filechan chan File) error {
+	defer close(filechan)
 	return filepath.Walk(fullpath,
 		func(p string, info os.FileInfo, err error) error {
 			if err != nil {
@@ -119,24 +175,14 @@ func listDirectory(fullpath string, linkcfg func(string) string) error {
 			ext := path.Ext(filename)
 			name := filename[0 : len(filename)-len(ext)]
 			parent := filepath.Dir(rel)
-			fmt.Println(p, info.Name(), parent, rel, ext)
-			c, err := parse(p)
-			if err != nil {
-				return err
-			}
-			c.Filepath = name
 
-			if parent != "." {
-				pattern := linkcfg(parent)
-				link, err := pathPattern(pattern).Expand(c)
-				if err != nil {
-					return err
-				}
-				c.Permalink = link
-			} else {
-				c.Permalink = filename
+			filechan <- File{
+				Root:      fullpath,
+				Source:    p,
+				Name:      name,
+				Extension: ext,
+				Parent:    parent,
 			}
-			fmt.Println(c)
 
 			return nil
 		})
