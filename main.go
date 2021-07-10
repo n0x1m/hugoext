@@ -46,37 +46,12 @@ func main() {
 	}
 
 	permalinks := cfg.GetStringMapString("permalinks")
-	//fmt.Println("permalinks", permalinks)
-
-	/*
-		fpath := "content/posts/first-post.md"
-		file, err := os.Open(fpath)
-		if err != nil {
-			log.Fatal("open", err)
-		}
-
-		page, err := ReadFrom(file)
-		if err != nil {
-			log.Fatal("read page", err)
-		}
-
-		fmt.Println(string(page.FrontMatter()))
-		fmt.Println(string(page.Content()))
-		meta, err := page.Metadata()
-		if err != nil {
-			log.Fatal("read meta", err)
-		}
-		c := NewContentFromMeta(meta)
-		fmt.Println(c)
-		link, err := pathPattern(permalinks["posts"]).Expand(c)
-		if err != nil {
-			log.Fatal("permalink expand", err)
-		}
-		fmt.Println(link)
-	*/
+	if permalinks == nil {
+		log.Println("no permalinks from config loaded, using default: ", defaultPermalinkFormat)
+	}
 
 	// test
-	linkcfg := func(subdir string) string {
+	linkpattern := func(subdir string) string {
 		format, ok := permalinks[subdir]
 		if ok {
 			return format
@@ -91,7 +66,7 @@ func main() {
 	// for each file, get destination path, switch file extension, remove underscore for index
 	var tree FileTree
 	for file := range files {
-		pattern := linkcfg(file.Parent)
+		pattern := linkpattern(file.Parent)
 		err := destinationPath(&file, pattern)
 		if err != nil {
 			fmt.Println(err, file)
@@ -116,6 +91,7 @@ func main() {
 
 		// write to source
 		tree.Files[i].NewBody = procout.Bytes()
+		fmt.Printf("processed %s (%dbytes)\n", file.Source, len(tree.Files[i].Body))
 	}
 
 	newpath := filepath.Join(".", "public")
@@ -126,7 +102,7 @@ func main() {
 
 	// write to destination
 	for _, file := range tree.Files {
-		fmt.Printf("%s -> %s (%d)\n", file.Source, file.Destination, len(file.Body))
+		//fmt.Printf("%s -> %s (%d)\n", file.Source, file.Destination, len(file.Body))
 
 		outfile := "index." + ext
 		outdir := filepath.Join(destination, file.Destination)
@@ -135,6 +111,12 @@ func main() {
 			if err = os.MkdirAll(newpath, os.ModePerm); err != nil {
 				log.Println(err)
 				continue
+			}
+			// TODO: change dir^
+			// TODO: consider links
+			if uglyurls {
+				outdir += ".gmi"
+				outfile = ""
 			}
 		} else {
 			outdir = destination
@@ -146,12 +128,15 @@ func main() {
 			log.Println(err)
 			continue
 		}
-		fmt.Println(fullpath, string(file.NewBody))
-		newfile.Write(file.NewBody)
+
+		n, _ := newfile.Write(file.NewBody)
 		newfile.Close()
+
+		fmt.Printf("written %s (%dbytes)\n", fullpath, n)
 	}
 
-	// replace links?
+	// TODO
+	// check/replace links
 	// write rss?
 	// write listings from template?
 }
@@ -251,14 +236,16 @@ func collectFiles(fullpath string, filechan chan File) error {
 
 func NewContentFromMeta(meta map[string]interface{}) *Content {
 	return &Content{
-		Title:      istring(meta["title"]),
-		Slug:       istring(meta["slug"]),
-		Categories: istringArr(meta["categories"]),
-		Date:       idate(meta["date"]),
+		Title:      stringFromInterface(meta["title"]),
+		Slug:       stringFromInterface(meta["slug"]),
+		Summary:    stringFromInterface(meta["summary"]),
+		Categories: stringArrayFromInterface(meta["categories"]),
+		Tags:       stringArrayFromInterface(meta["tags"]),
+		Date:       dateFromInterface(meta["date"]),
 	}
 }
 
-func istring(input interface{}) string {
+func stringFromInterface(input interface{}) string {
 	str, ok := input.(string)
 	if ok {
 		return str
@@ -266,7 +253,7 @@ func istring(input interface{}) string {
 	return ""
 }
 
-func idate(input interface{}) time.Time {
+func dateFromInterface(input interface{}) time.Time {
 	str, ok := input.(string)
 	if !ok {
 		return time.Now()
@@ -284,10 +271,14 @@ func idate(input interface{}) time.Time {
 	return t
 }
 
-func istringArr(input interface{}) []string {
-	str, ok := input.([]string)
+func stringArrayFromInterface(input interface{}) []string {
+	strarr, ok := input.([]interface{})
 	if ok {
-		return str
+		var out []string
+		for _, str := range strarr {
+			out = append(out, stringFromInterface(str))
+		}
+		return out
 	}
 	return nil
 }
