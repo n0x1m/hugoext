@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gohugoio/hugo/config"
+	"github.com/n0x1m/hugoext/hugov0492"
 	"github.com/spf13/afero"
 )
 
@@ -157,14 +158,14 @@ type File struct {
 	NewBody []byte
 }
 
-func parse(fullpath string) ([]byte, *Content, error) {
+func parse(fullpath string) ([]byte, *hugov0492.Content, error) {
 	file, err := os.Open(fullpath)
 	if err != nil {
 		return nil, nil, err
 	}
 	defer file.Close()
 
-	page, err := ReadFrom(file)
+	page, err := hugov0492.ReadFrom(file)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -189,7 +190,7 @@ func destinationPath(file *File, pattern string) error {
 	file.Body = body
 
 	if file.Parent != "." {
-		link, err := pathPattern(pattern).Expand(c)
+		link, err := hugov0492.PathPattern(pattern).Expand(c)
 		if err != nil {
 			return err
 		}
@@ -234,8 +235,8 @@ func collectFiles(fullpath string, filechan chan File) error {
 		})
 }
 
-func NewContentFromMeta(meta map[string]interface{}) *Content {
-	return &Content{
+func NewContentFromMeta(meta map[string]interface{}) *hugov0492.Content {
+	return &hugov0492.Content{
 		Title:      stringFromInterface(meta["title"]),
 		Slug:       stringFromInterface(meta["slug"]),
 		Summary:    stringFromInterface(meta["summary"]),
