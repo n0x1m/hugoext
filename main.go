@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	defaultExt         = "gmi"
-	defaultProcessor   = "md2gmi"
+	defaultExt         = "md"
+	defaultProcessor   = ""
 	defaultSource      = "content"
 	defaultDestination = "public"
 	defaultConfigPath  = "config.toml"

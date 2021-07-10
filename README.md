@@ -4,16 +4,28 @@ Utility to parse a hugo config file and create the same file structure for conte
 arbitrary output pipe extension.
 
 Hugo parses primarily markdown files and go templates. The initial motivation for this utility was
-to enable the same tools to publish a gemlog version of the same blog to make it accessible through
-the Gemini protocol.
+to enable the same tools to publish a gemlog version of the same blog to make it accessible as
+gemtext via the Gemini protocol alongside the web html version.
 
-**NOTE**: not many features, this is minimal and only has one use case for now.
+**NOTE**: this is minimal and only has one use case for now, many edge cases may not be covered.
 
 Features
 - reads hugo `.toml` file for section output formats
 - supports an arbitrary document processor, any program that supports UNIX pipes
+- ugly urls
+- section listings
+- with drafts
 
-When the selected extension is blank, markdown files will be copied unmodified.
+To illustrate what this program does, run the following in the hugo directory.
+
+```
+hugoext -proc="" -ext txt
+```
+
+The markdown files from `./content` will be written as `.txt` files to the `./public` directory. We
+can add a processor that converts markdown to a different extension and output the same directory
+layout as hugo does. Here, when the selected processor is blank, markdown files will be copied
+unmodified.
 
 ## Example Use
 
@@ -23,6 +35,7 @@ gemtext. Executed from the hugo directory:
 ```
 hugoext -ext gmi -pipe md2gmi
 ```
+
 
 It abides the hugo section config in `[permalinks]` but only uses the content subdirectory to
 determine the section. An example section config in hugo looks like this:
