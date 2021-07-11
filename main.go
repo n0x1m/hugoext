@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -24,11 +25,11 @@ const (
 )
 
 func main() {
-	var ext, pipe, source, destination, cfgPath string
+	var ext, pipecmd, source, destination, cfgPath string
 	var noSectionList bool
 
 	flag.StringVar(&ext, "ext", defaultExt, "ext to look for templates in ./layout")
-	flag.StringVar(&pipe, "pipe", defaultProcessor, "pipe markdown to this program for content processing")
+	flag.StringVar(&pipecmd, "pipe", defaultProcessor, "pipe markdown to this program for content processing")
 	flag.StringVar(&source, "source", defaultSource, "source directory")
 	flag.StringVar(&destination, "destination", defaultDestination, "output directory")
 	flag.StringVar(&cfgPath, "config", defaultConfigPath, "hugo config path")
@@ -36,7 +37,7 @@ func main() {
 	flag.Parse()
 
 	// what are we doing
-	fmt.Printf("hugoext: converting hugo markdown to %v with %v\n", ext, pipe)
+	fmt.Printf("hugoext: converting hugo markdown to %v with %v\n", ext, pipecmd)
 
 	// config
 	cfg, err := config.FromFile(afero.NewOsFs(), "config.toml")
@@ -79,10 +80,9 @@ func main() {
 		pattern := linkpattern(file.Parent)
 		err := destinationPath(&file, pattern)
 		if err != nil {
-			fmt.Println(err, file)
-			continue
+			log.Fatalf("failed to derive destination for %v error: %v", file.Source, err)
 		}
-		//fmt.Printf("%s -> %s (%d)\n", file.Source, file.Destination, len(file.Body))
+
 		if file.Draft && !buildDrafts {
 			fmt.Printf("skipping draft %s (%dbytes)\n", file.Source, len(file.Body))
 			continue
@@ -92,55 +92,36 @@ func main() {
 
 	// call proc and pipe content through it, catch output of proc
 	for i, file := range tree.Files {
-		// fmt.Printf("%s -> %s (%d)\n", file.Source, file.Destination, len(file.Body))
-		extpipe := exec.Command(pipe)
 		buf := bytes.NewReader(file.Body)
-		extpipe.Stdin = buf
-
-		var procout bytes.Buffer
-		extpipe.Stdout = &procout
-
-		extpipe.Start()
-		extpipe.Wait()
+		out := pipe(pipecmd, buf)
 
 		// write to source
-		tree.Files[i].NewBody = procout.Bytes()
+		tree.Files[i].NewBody = out
 		fmt.Printf("processed %s (%dbytes)\n", file.Source, len(tree.Files[i].Body))
 	}
 
-	newpath := filepath.Join(".", "public")
-	err = os.MkdirAll(newpath, os.ModePerm)
-	if err != nil {
+	newdir := filepath.Join(".", "public")
+	if made, err := mkdir(newdir); err != nil {
 		log.Fatal(err)
+	} else if made {
+		fmt.Printf("mkdir %s\n", newdir)
 	}
 
 	// write to destination
 	for _, file := range tree.Files {
-		//fmt.Printf("%s -> %s (%d)\n", file.Source, file.Destination, len(file.Body))
-
-		outfile := "index." + ext
-		outdir := file.Destination
-
-		if uglyURLs && file.Destination != "index" {
-			// make the last element in destination the file
-			outfile = filepath.Base(file.Destination) + "." + ext
-			// set the parent directory of that file to be the dir to create
-			outdir = filepath.Dir(file.Destination)
-		}
-
-		if file.Destination == "index" {
-			outdir = "."
-		}
+		outdir, outfile := targetPath(file.Destination, ext, uglyURLs)
 
 		// ensure directory exists
-		newpath := filepath.Join(destination, outdir)
-		fmt.Printf("mkdir %s\n", newpath)
-		if err = os.MkdirAll(newpath, os.ModePerm); err != nil {
-			log.Fatalf("cannot directory file %s, error: %v", newpath, err)
+		newdir := filepath.Join(destination, outdir)
+		if made, err := mkdir(newdir); err != nil {
+			log.Fatal(err)
+		} else if made {
+			fmt.Printf("mkdir %s\n", newdir)
 		}
 
+		fullpath := filepath.Join(newdir, outfile)
+
 		// create file based on directory and filename
-		fullpath := filepath.Join(newpath, outfile)
 		newfile, err := os.Create(fullpath)
 		if err != nil {
 			log.Fatalf("cannot create file %s, error: %v", fullpath, err)
@@ -155,6 +136,10 @@ func main() {
 		fmt.Printf("written %s (%dbytes)\n", fullpath, n)
 	}
 
+	for _, file := range tree.Files {
+		fmt.Printf("section %v\n", file.Parent)
+	}
+
 	// TODO
 	//
 	// append section listings
@@ -166,4 +151,47 @@ func main() {
 	// check/replace links
 	// write rss?
 	// write listings from template?
+}
+
+func pipe(cmd string, input io.Reader) []byte {
+	extpipe := exec.Command(cmd)
+	extpipe.Stdin = input
+
+	var pipeout bytes.Buffer
+	extpipe.Stdout = &pipeout
+
+	extpipe.Start()
+	extpipe.Wait()
+
+	return pipeout.Bytes()
+}
+
+func targetPath(dest, newext string, uglyURLs bool) (dir string, filename string) {
+	filename = "index." + newext
+	dir = dest
+
+	if uglyURLs && dest != "index" {
+		// make the last element in destination the file
+		filename = filepath.Base(dest) + "." + newext
+		// set the parent directory of that file to be the dir to create
+		dir = filepath.Dir(dest)
+	}
+
+	if dest == "index" {
+		dir = "."
+	}
+	return
+}
+
+func mkdir(dir string) (bool, error) {
+	// skip if this exists
+	if _, err := os.Stat(dir); err == nil {
+		return false, nil
+	}
+
+	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
