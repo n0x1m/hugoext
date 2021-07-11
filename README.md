@@ -54,15 +54,15 @@ page = ":filename"
 ### Installation
 
 ```
-go install github.com/n0x1m/hugoext
+go install github.com/n0x1m/hugoext@latest
 ```
 
 To use the gemini file server and markdown to gemtext converter in the examples below, also install
 these:
 
 ```
-go install github.com/n0x1m/md2gmi
-go install github.com/n0x1m/gmifs
+go install github.com/n0x1m/md2gmi@latest
+go install github.com/n0x1m/gmifs@latest
 ```
 
 ### Development
