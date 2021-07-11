@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-type Content struct {
+type PageMetadata struct {
 	Title      string
 	Slug       string
 	Summary    string
@@ -43,7 +43,7 @@ func init() {
 
 // pageToPermaAttribute is the type of a function which, given a page and a tag
 // can return a string to go in that position in the page (or an error)
-type pageToPermaAttribute func(*Content, string) (string, error)
+type pageToPermaAttribute func(*PageMetadata, string) (string, error)
 
 // PathPattern represents a string which builds up a URL from attributes
 type PathPattern string
@@ -85,7 +85,7 @@ func (pp PathPattern) validate() bool {
 
 // Expand on a PathPattern takes a Content and returns the fully expanded Permalink
 // or an error explaining the failure.
-func (pp PathPattern) Expand(p *Content) (string, error) {
+func (pp PathPattern) Expand(m *PageMetadata) (string, error) {
 	if !pp.validate() {
 		return "", fmt.Errorf("error")
 	}
@@ -111,7 +111,7 @@ func (pp PathPattern) Expand(p *Content) (string, error) {
 				return "", fmt.Errorf("err2")
 			}
 
-			newAttr, err := callback(p, attr)
+			newAttr, err := callback(m, attr)
 
 			if err != nil {
 				return "", fmt.Errorf("err3 %w", err)
@@ -125,23 +125,23 @@ func (pp PathPattern) Expand(p *Content) (string, error) {
 	return strings.Join(sections, "/"), nil
 }
 
-func pageToPermalinkDate(p *Content, dateField string) (string, error) {
+func pageToPermalinkDate(m *PageMetadata, dateField string) (string, error) {
 	// a Content contains a Node which provides a field Date, time.Time
 	switch dateField {
 	case "year":
-		return strconv.Itoa(p.Date.Year()), nil
+		return strconv.Itoa(m.Date.Year()), nil
 	case "month":
-		return fmt.Sprintf("%02d", int(p.Date.Month())), nil
+		return fmt.Sprintf("%02d", int(m.Date.Month())), nil
 	case "monthname":
-		return p.Date.Month().String(), nil
+		return m.Date.Month().String(), nil
 	case "day":
-		return fmt.Sprintf("%02d", p.Date.Day()), nil
+		return fmt.Sprintf("%02d", m.Date.Day()), nil
 	case "weekday":
-		return strconv.Itoa(int(p.Date.Weekday())), nil
+		return strconv.Itoa(int(m.Date.Weekday())), nil
 	case "weekdayname":
-		return p.Date.Weekday().String(), nil
+		return m.Date.Weekday().String(), nil
 	case "yearday":
-		return strconv.Itoa(p.Date.YearDay()), nil
+		return strconv.Itoa(m.Date.YearDay()), nil
 	}
 	//TODO: support classic strftime escapes too
 	// (and pass those through despite not being in the map)
@@ -149,33 +149,33 @@ func pageToPermalinkDate(p *Content, dateField string) (string, error) {
 }
 
 // if the page has a slug, return the slug, else return the title
-func pageToPermalinkSlugElseTitle(p *Content, a string) (string, error) {
-	if p.Slug != "" {
+func pageToPermalinkSlugElseTitle(m *PageMetadata, a string) (string, error) {
+	if m.Slug != "" {
 		// Don't start or end with a -
 		// TODO(bep) this doesn't look good... Set the Slug once.
-		if strings.HasPrefix(p.Slug, "-") {
-			p.Slug = p.Slug[1:len(p.Slug)]
+		if strings.HasPrefix(m.Slug, "-") {
+			m.Slug = m.Slug[1:len(m.Slug)]
 		}
 
-		if strings.HasSuffix(p.Slug, "-") {
-			p.Slug = p.Slug[0 : len(p.Slug)-1]
+		if strings.HasSuffix(m.Slug, "-") {
+			m.Slug = m.Slug[0 : len(m.Slug)-1]
 		}
-		return URLEscape(p.Slug)
+		return URLEscape(m.Slug)
 	}
-	return pageToPermalinkTitle(p, a)
+	return pageToPermalinkTitle(m, a)
 }
 
 // pageToPermalinkFilename returns the URL-safe form of the filename
-func pageToPermalinkFilename(p *Content, _ string) (string, error) {
-	return URLEscape(p.Filepath)
+func pageToPermalinkFilename(m *PageMetadata, _ string) (string, error) {
+	return URLEscape(m.Filepath)
 }
 
-func pageToPermalinkTitle(p *Content, _ string) (string, error) {
-	return URLEscape(p.Title)
+func pageToPermalinkTitle(m *PageMetadata, _ string) (string, error) {
+	return URLEscape(m.Title)
 }
 
-func pageToPermalinkSection(p *Content, _ string) (string, error) {
-	return URLEscape(p.Subdir)
+func pageToPermalinkSection(m *PageMetadata, _ string) (string, error) {
+	return URLEscape(m.Subdir)
 }
 
 func URLEscape(uri string) (string, error) {

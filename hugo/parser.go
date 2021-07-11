@@ -60,6 +60,9 @@ type Page interface {
 	// Content contains the raw page content.
 	Content() []byte
 
+	// Body contains the full document.
+	Body() []byte
+
 	// IsRenderable denotes that the page should be rendered.
 	IsRenderable() bool
 
@@ -72,6 +75,14 @@ type page struct {
 	render      bool
 	frontmatter []byte
 	content     []byte
+}
+
+// Body returns the raw full document content.
+func (p page) Body() []byte {
+	body := p.frontmatter
+	body = append(body, '\n')
+	body = append(body, p.content...)
+	return body
 }
 
 // Content returns the raw page content.
