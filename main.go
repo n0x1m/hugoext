@@ -173,6 +173,8 @@ func main() {
 	}
 
 	for name, section := range sections {
+		// TODO: come up with sth better as one might have content there.
+		os.Remove(section.File)
 		section.Write(section.File)
 		fmt.Printf("written section listing %s to %s\n", name, section.File)
 	}
@@ -180,8 +182,6 @@ func main() {
 	section, ok := sections[seconOnRoot]
 	if ok {
 		sectionFile := filepath.Join(destination, "index."+ext)
-		// TODO: come up with sth better as one might have content there.
-		os.Remove(sectionFile)
 		section.Write(sectionFile)
 		fmt.Printf("written section listing for root to %s\n", section.File)
 	}
