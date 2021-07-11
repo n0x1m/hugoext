@@ -12,7 +12,7 @@ via the Gemini protocol.
 **Features**
 - reads hugo `.toml` file for section output formats
 - supports an arbitrary document processor, any program that supports UNIX pipes
-- ugly urls, note that I have not tested this much with links, nice urls recommended
+- ugly urls, note that I have not tested this much with links, pretty urls recommended
 - append section listings to section pages, optionally on root
 - supports with and without drafts from config
 - composable with other tools
