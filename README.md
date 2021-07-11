@@ -1,6 +1,6 @@
 # hugoext
 
-Utility to parse a hugo config file and create the same file structure for content through an
+Utility to parse the hugo config file and create the same file structure for content through an
 arbitrary output pipe extension.
 
 Hugo parses primarily markdown files and go templates. The initial motivation for this utility was
@@ -19,7 +19,7 @@ Features
 To illustrate what this program does, run the following in the hugo directory.
 
 ```
-hugoext -proc="" -ext txt
+hugoext -ext txt -pipe=""
 ```
 
 The markdown files from `./content` will be written as `.txt` files to the `./public` directory. We

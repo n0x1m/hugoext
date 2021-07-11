@@ -29,11 +29,11 @@ const (
 )
 
 func main() {
-	var ext, processor, source, destination, cfgPath string
+	var ext, pipe, source, destination, cfgPath string
 	var uglyURLs, noSectionList, withDrafts bool
 
 	flag.StringVar(&ext, "ext", defaultExt, "ext to look for templates in ./layout")
-	flag.StringVar(&processor, "proc", defaultProcessor, "processor to pipe markdown content through")
+	flag.StringVar(&pipe, "pipe", defaultProcessor, "pipe markdown to this program for content processing")
 	flag.StringVar(&source, "source", defaultSource, "source directory")
 	flag.StringVar(&destination, "destination", defaultDestination, "output directory")
 	flag.StringVar(&cfgPath, "config", defaultConfigPath, "hugo config path")
@@ -42,7 +42,7 @@ func main() {
 	flag.BoolVar(&withDrafts, "enable-withDrafts", false, "include withDrafts in processing and output")
 	flag.Parse()
 
-	fmt.Printf("converting markdown to %v with %v\n", ext, processor)
+	fmt.Printf("converting markdown to %v with %v\n", ext, pipe)
 
 	osfs := afero.NewOsFs()
 	cfg, err := config.FromFile(osfs, "config.toml")
@@ -87,7 +87,7 @@ func main() {
 	// call proc and pipe content through it, catch output of proc
 	for i, file := range tree.Files {
 		// fmt.Printf("%s -> %s (%d)\n", file.Source, file.Destination, len(file.Body))
-		extpipe := exec.Command(processor)
+		extpipe := exec.Command(pipe)
 		buf := bytes.NewReader(file.Body)
 		extpipe.Stdin = buf
 
@@ -113,44 +113,50 @@ func main() {
 		//fmt.Printf("%s -> %s (%d)\n", file.Source, file.Destination, len(file.Body))
 
 		outfile := "index." + ext
-		outdir := filepath.Join(destination, file.Destination)
-		if file.Destination != "index" {
-			newpath := filepath.Join(destination, file.Destination)
-			if err = os.MkdirAll(newpath, os.ModePerm); err != nil {
-				log.Println(err)
-				continue
-			}
-			// TODO: change dir^
-			// TODO: consider links
-			if uglyURLs {
-				outdir += ".gmi"
-				outfile = ""
-			}
-		} else {
-			outdir = destination
+		outdir := file.Destination
+
+		if uglyURLs && file.Destination != "index" {
+			// make the last element in destination the file
+			outfile = filepath.Base(file.Destination) + "." + ext
+			// set the parent directory of that file to be the dir to create
+			outdir = filepath.Dir(file.Destination)
 		}
 
-		fullpath := filepath.Join(outdir, outfile)
+		if file.Destination == "index" {
+			outdir = "."
+		}
+
+		// ensure directory exists
+		newpath := filepath.Join(destination, outdir)
+		fmt.Printf("mkdir %s\n", newpath)
+		if err = os.MkdirAll(newpath, os.ModePerm); err != nil {
+			log.Fatalf("cannot directory file %s, error: %v", newpath, err)
+		}
+
+		// create file based on directory and filename
+		fullpath := filepath.Join(newpath, outfile)
 		newfile, err := os.Create(fullpath)
 		if err != nil {
-			log.Println(err)
-			continue
+			log.Fatalf("cannot create file %s, error: %v", fullpath, err)
 		}
 
-		n, _ := newfile.Write(file.NewBody)
+		n, err := newfile.Write(file.NewBody)
+		if err != nil {
+			log.Fatalf("cannot write file %s, error: %v", fullpath, err)
+		}
 		newfile.Close()
 
 		fmt.Printf("written %s (%dbytes)\n", fullpath, n)
 	}
 
 	// TODO
-	// ugly urls
 	//
 	// append section listings
 	// => link title line
 	// date - summary block
 
 	// TODO
+	// in watch mode, compare timestamps of files before replacement, keep index?
 	// check/replace links
 	// write rss?
 	// write listings from template?
