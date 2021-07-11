@@ -7,13 +7,9 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
-	"strings"
-	"time"
 
 	"github.com/gohugoio/hugo/config"
-	"github.com/n0x1m/hugoext/hugo"
 	"github.com/spf13/afero"
 )
 
@@ -30,38 +26,45 @@ const (
 
 func main() {
 	var ext, pipe, source, destination, cfgPath string
-	var uglyURLs, noSectionList, withDrafts bool
+	var noSectionList, withDrafts bool
 
 	flag.StringVar(&ext, "ext", defaultExt, "ext to look for templates in ./layout")
 	flag.StringVar(&pipe, "pipe", defaultProcessor, "pipe markdown to this program for content processing")
 	flag.StringVar(&source, "source", defaultSource, "source directory")
 	flag.StringVar(&destination, "destination", defaultDestination, "output directory")
 	flag.StringVar(&cfgPath, "config", defaultConfigPath, "hugo config path")
-	flag.BoolVar(&uglyURLs, "ugly-urls", false, "use directories with index or .ext files")
 	flag.BoolVar(&noSectionList, "no-section-list", false, "disable auto append of section content lists")
 	flag.BoolVar(&withDrafts, "enable-withDrafts", false, "include withDrafts in processing and output")
 	flag.Parse()
 
-	fmt.Printf("converting markdown to %v with %v\n", ext, pipe)
+	// what are we doing
+	fmt.Printf("converting hugo markdown to %v with %v\n", ext, pipe)
 
-	osfs := afero.NewOsFs()
-	cfg, err := config.FromFile(osfs, "config.toml")
+	// config
+	cfg, err := config.FromFile(afero.NewOsFs(), "config.toml")
 	if err != nil {
 		log.Fatal("config from file", err)
 	}
 
-	permalinks := cfg.GetStringMapString("permalinks")
-	if permalinks == nil {
-		log.Println("no permalinks from config loaded, using default: ", defaultPermalinkFormat)
+	uglyURLs := cfg.GetBool("uglyURLs")
+	if !cfg.IsSet("uglyURLs") {
+		fmt.Println("config: no uglyURLs set, using default: ", uglyURLs)
 	}
 
-	linkpattern := func(subdir string) string {
-		format, ok := permalinks[subdir]
+	permalinks := cfg.GetStringMapString("permalinks")
+	if permalinks == nil {
+		fmt.Println("config: no permalinks set, using default: ", defaultPermalinkFormat)
+	}
+
+	linkpattern := func(section string) string {
+		format, ok := permalinks[section]
 		if ok {
 			return format
 		}
 		return defaultPermalinkFormat
 	}
+
+	// process sources
 
 	// iterate through file tree source
 	files := make(chan File)
@@ -160,152 +163,4 @@ func main() {
 	// check/replace links
 	// write rss?
 	// write listings from template?
-}
-
-type FileTree struct {
-	Files []File
-}
-
-type File struct {
-	Root        string
-	Source      string
-	Destination string
-	Parent      string
-	Name        string
-	Extension   string
-
-	Draft bool
-
-	Body    []byte
-	NewBody []byte
-}
-
-func parse(fullpath string) ([]byte, *hugo.Content, error) {
-	file, err := os.Open(fullpath)
-	if err != nil {
-		return nil, nil, err
-	}
-	defer file.Close()
-
-	page, err := hugo.ReadFrom(file)
-	if err != nil {
-		return nil, nil, err
-	}
-	meta, err := page.Metadata()
-	if err != nil {
-		return nil, nil, err
-	}
-	c := NewContentFromMeta(meta)
-	body := page.FrontMatter()
-	body = append(body, '\n')
-	body = append(body, page.Content()...)
-
-	return body, c, nil
-}
-
-func destinationPath(file *File, pattern string) error {
-	body, c, err := parse(file.Source)
-	if err != nil {
-		return err
-	}
-	c.Filepath = file.Name
-	file.Body = body
-	file.Draft = c.Draft
-
-	if file.Parent != "." {
-		link, err := hugo.PathPattern(pattern).Expand(c)
-		if err != nil {
-			return err
-		}
-		file.Destination = link
-	} else {
-		file.Destination = strings.TrimLeft(file.Name, "_")
-	}
-
-	return nil
-}
-
-func collectFiles(fullpath string, filechan chan File) error {
-	defer close(filechan)
-	return filepath.Walk(fullpath,
-		func(p string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			if info.IsDir() {
-				return nil
-			}
-
-			rel, err := filepath.Rel(fullpath, p)
-			if err != nil {
-				return err
-			}
-
-			filename := info.Name()
-			ext := path.Ext(filename)
-			name := filename[0 : len(filename)-len(ext)]
-			parent := filepath.Dir(rel)
-
-			filechan <- File{
-				Root:      fullpath,
-				Source:    p,
-				Name:      name,
-				Extension: ext,
-				Parent:    parent,
-			}
-
-			return nil
-		})
-}
-
-func NewContentFromMeta(meta map[string]interface{}) *hugo.Content {
-	return &hugo.Content{
-		Title:      stringFromInterface(meta["title"]),
-		Slug:       stringFromInterface(meta["slug"]),
-		Summary:    stringFromInterface(meta["summary"]),
-		Categories: stringArrayFromInterface(meta["categories"]),
-		Tags:       stringArrayFromInterface(meta["tags"]),
-		Date:       dateFromInterface(meta["date"]),
-		Draft:      boolFromInterface(meta["draft"]),
-	}
-}
-
-func stringFromInterface(input interface{}) string {
-	str, _ := input.(string)
-	return str
-}
-
-func boolFromInterface(input interface{}) bool {
-	v, _ := input.(bool)
-	return v
-}
-
-func dateFromInterface(input interface{}) time.Time {
-	str, ok := input.(string)
-	if !ok {
-		return time.Now()
-
-	}
-	t, err := time.Parse(time.RFC3339, str)
-	if err != nil {
-		// try just date, or give up
-		t, err := time.Parse("2006-01-02", str)
-		if err != nil {
-			return time.Now()
-		}
-		return t
-	}
-	return t
-}
-
-func stringArrayFromInterface(input interface{}) []string {
-	strarr, ok := input.([]interface{})
-	if ok {
-		var out []string
-		for _, str := range strarr {
-			out = append(out, stringFromInterface(str))
-		}
-		return out
-	}
-	return nil
 }
