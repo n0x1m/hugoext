@@ -15,17 +15,18 @@ import (
 )
 
 const (
-	defaultExt         = "md"
-	defaultProcessor   = ""
-	defaultSource      = "content"
-	defaultDestination = "public"
-	defaultConfigPath  = "config.toml"
+	defaultExt           = "md"
+	defaultProcessor     = ""
+	defaultSource        = "content"
+	defaultDestination   = "public"
+	defaultConfigPath    = "config.toml"
+	defaultSectionOnRoot = "posts"
 
 	defaultPermalinkFormat = "/:year/:month/:title/"
 )
 
 func main() {
-	var ext, pipecmd, source, destination, cfgPath string
+	var ext, pipecmd, source, destination, cfgPath, seconOnRoot string
 	var noSectionList bool
 
 	flag.StringVar(&ext, "ext", defaultExt, "ext to look for templates in ./layout")
@@ -34,6 +35,7 @@ func main() {
 	flag.StringVar(&destination, "destination", defaultDestination, "output directory")
 	flag.StringVar(&cfgPath, "config", defaultConfigPath, "hugo config path")
 	flag.BoolVar(&noSectionList, "no-section-list", false, "disable auto append of section content lists")
+	flag.StringVar(&seconOnRoot, "section-on-root", defaultSectionOnRoot, "if append sections, add this one on the root")
 	flag.Parse()
 
 	// what are we doing
@@ -136,15 +138,51 @@ func main() {
 		fmt.Printf("written %s (%dbytes)\n", fullpath, n)
 	}
 
-	for _, file := range tree.Files {
-		fmt.Printf("section %v\n", file.Parent)
+	// we're done if we
+	if noSectionList {
+		return
 	}
 
-	// TODO
-	//
-	// append section listings
-	// => link title line
-	// date - summary block
+	// aggregate sections and section entries
+	sections := make(map[string]*Section)
+	for _, file := range tree.Files {
+		// not a section
+		if file.Parent == "." {
+			continue
+		}
+		name := file.Parent
+		sectionFile := filepath.Join(destination, file.Parent, "index."+ext)
+
+		//fmt.Printf("section %v\n", sectionFile)
+		link := file.Destination
+		if uglyURLs {
+			link += "." + ext
+		}
+
+		//fmt.Printf("link %v\n", link)
+		if _, ok := sections[name]; !ok {
+			sections[name] = &Section{File: sectionFile}
+		}
+
+		sections[name].List = append(sections[name].List, SectionEntry{
+			Date:    file.Metadata.Date,
+			Title:   file.Metadata.Title,
+			Summary: file.Metadata.Summary,
+			Link:    link,
+		})
+	}
+
+	for name, section := range sections {
+		section.Write(section.File)
+		fmt.Printf("written section listing %s to %s\n", name, section.File)
+	}
+
+	section, ok := sections[seconOnRoot]
+	if ok {
+		sectionFile := filepath.Join(destination, "index."+ext)
+		section.Write(sectionFile)
+		fmt.Printf("written section listing for root to %s\n", section.File)
+	}
 
 	// TODO
 	// in watch mode, compare timestamps of files before replacement, keep index?
