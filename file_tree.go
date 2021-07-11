@@ -28,6 +28,33 @@ type File struct {
 	NewBody  []byte
 }
 
+func (file *File) Write(dest, newext string, uglyURLs bool) (string, error) {
+	outdir, outfile := targetPath(file.Destination, newext, uglyURLs)
+
+	// ensure directory exists
+	newdir := filepath.Join(dest, outdir)
+	if made, err := mkdir(newdir); err != nil {
+		return "", err
+	} else if made {
+		fmt.Printf("mkdir %s\n", newdir)
+	}
+
+	fullpath := filepath.Join(newdir, outfile)
+
+	// create file based on directory and filename
+	newfile, err := os.Create(fullpath)
+	if err != nil {
+		return fullpath, err
+	}
+
+	if _, err = newfile.Write(file.NewBody); err != nil {
+		return fullpath, err
+	}
+
+	newfile.Close()
+	return fullpath, nil
+}
+
 func parsePage(fullpath string) (hugo.Page, error) {
 	file, err := os.Open(fullpath)
 	if err != nil {

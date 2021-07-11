@@ -17,6 +17,10 @@ via the Gemini protocol.
 - supports with and without drafts from config
 - composable with other tools
 
+TODOs:
+- cleanup long main
+- gemrss?
+
 To illustrate what this program does, run the following in the hugo directory.
 
 ```

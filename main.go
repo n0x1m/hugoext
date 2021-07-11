@@ -8,8 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gohugoio/hugo/config"
-	"github.com/spf13/afero"
+	"github.com/n0x1m/hugoext/hugo"
 )
 
 const (
@@ -39,21 +38,9 @@ func main() {
 	// what are we doing
 	fmt.Printf("hugoext: converting hugo markdown to %v with %v\n", ext, pipecmd)
 
-	// config
-	cfg, err := config.FromFile(afero.NewOsFs(), "config.toml")
-	if err != nil {
-		log.Fatal("config from file", err)
-	}
-
+	cfg := hugo.Config{}
 	uglyURLs := cfg.GetBool("uglyURLs")
-	if !cfg.IsSet("uglyURLs") {
-		fmt.Println("config: no uglyURLs set, using default: ", uglyURLs)
-	}
-
 	buildDrafts := cfg.GetBool("buildDrafts")
-	if !cfg.IsSet("buildDrafts") {
-		fmt.Println("config: no buildDrafts set, using default: ", buildDrafts)
-	}
 
 	permalinks := cfg.GetStringMapString("permalinks")
 	if permalinks == nil {
@@ -61,8 +48,7 @@ func main() {
 	}
 
 	linkpattern := func(section string) string {
-		format, ok := permalinks[section]
-		if ok {
+		if format, ok := permalinks[section]; ok {
 			return format
 		}
 
@@ -72,13 +58,13 @@ func main() {
 	// process sources
 
 	// iterate through file tree source
-	files := make(chan File)
-	go collectFiles(source, files)
+	fileChan := make(chan File)
+	go collectFiles(source, fileChan)
 
 	// for each file, get destination path, switch file extension, remove underscore for index
 	var tree FileTree
 
-	for file := range files {
+	for file := range fileChan {
 		pattern := linkpattern(file.Parent)
 
 		err := destinationPath(&file, pattern)
@@ -116,36 +102,17 @@ func main() {
 		fmt.Printf("mkdir %s\n", newdir)
 	}
 
-	// write to destination
+	// write new content to destination
 	for _, file := range tree.Files {
-		outdir, outfile := targetPath(file.Destination, ext, uglyURLs)
-
-		// ensure directory exists
-		newdir := filepath.Join(destination, outdir)
-		if made, err := mkdir(newdir); err != nil {
-			log.Fatal(err)
-		} else if made {
-			fmt.Printf("mkdir %s\n", newdir)
-		}
-
-		fullpath := filepath.Join(newdir, outfile)
-
-		// create file based on directory and filename
-		newfile, err := os.Create(fullpath)
+		newpath, err := file.Write(destination, ext, uglyURLs)
 		if err != nil {
-			log.Fatalf("cannot create file %s, error: %v", fullpath, err)
+			log.Fatalf("new file write '%v' failed with %v", file.Name, err)
 		}
 
-		n, err := newfile.Write(file.NewBody)
-		if err != nil {
-			log.Fatalf("cannot write file %s, error: %v", fullpath, err)
-		}
-
-		newfile.Close()
-		fmt.Printf("written %s (%dbytes)\n", fullpath, n)
+		fmt.Printf("written %s (%dbytes)\n", newpath, len(file.NewBody))
 	}
 
-	// we're done if we
+	// we're done if we don't write any sections
 	if noSectionList {
 		return
 	}
