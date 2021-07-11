@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -30,22 +31,24 @@ type File struct {
 func parsePage(fullpath string) (hugo.Page, error) {
 	file, err := os.Open(fullpath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("file open: %w", err)
 	}
 	defer file.Close()
 
 	page, err := hugo.ReadFrom(file)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("hugo read from: %w", err)
 	}
+
 	return page, nil
 }
 
 func parseMetadata(page hugo.Page) (*hugo.PageMetadata, error) {
 	meta, err := page.Metadata()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("page metadata: %w", err)
 	}
+
 	c := NewContentFromMeta(meta)
 
 	return c, nil
@@ -54,18 +57,23 @@ func parseMetadata(page hugo.Page) (*hugo.PageMetadata, error) {
 func destinationPath(file *File, pattern string) error {
 	p, err := parsePage(file.Source)
 	if err != nil {
-		return err
+		return fmt.Errorf("parse page: %w", err)
 	}
 
 	// create content
 	c, err := parseMetadata(p)
+	if err != nil {
+		return fmt.Errorf("parse metadata: %w", err)
+	}
+
 	c.Filepath = file.Name
 
 	if file.Parent != "." {
 		link, err := hugo.PathPattern(pattern).Expand(c)
 		if err != nil {
-			return err
+			return fmt.Errorf("hugo pathpattern: %w", err)
 		}
+
 		file.Destination = link
 	} else {
 		file.Destination = strings.TrimLeft(file.Name, "_")
@@ -80,7 +88,8 @@ func destinationPath(file *File, pattern string) error {
 
 func collectFiles(fullpath string, filechan chan File) error {
 	defer close(filechan)
-	return filepath.Walk(fullpath,
+
+	err := filepath.Walk(fullpath,
 		func(p string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
@@ -91,7 +100,7 @@ func collectFiles(fullpath string, filechan chan File) error {
 
 			rel, err := filepath.Rel(fullpath, p)
 			if err != nil {
-				return err
+				return fmt.Errorf("rel path: %w", err)
 			}
 
 			filename := info.Name()
@@ -109,4 +118,9 @@ func collectFiles(fullpath string, filechan chan File) error {
 
 			return nil
 		})
+	if err != nil {
+		return fmt.Errorf("filetree walk: %w", err)
+	}
+
+	return nil
 }

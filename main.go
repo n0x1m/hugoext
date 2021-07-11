@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/gohugoio/hugo/config"
@@ -67,6 +65,7 @@ func main() {
 		if ok {
 			return format
 		}
+
 		return defaultPermalinkFormat
 	}
 
@@ -78,8 +77,10 @@ func main() {
 
 	// for each file, get destination path, switch file extension, remove underscore for index
 	var tree FileTree
+
 	for file := range files {
 		pattern := linkpattern(file.Parent)
+
 		err := destinationPath(&file, pattern)
 		if err != nil {
 			log.Fatalf("failed to derive destination for %v error: %v", file.Source, err)
@@ -87,15 +88,21 @@ func main() {
 
 		if file.Draft && !buildDrafts {
 			fmt.Printf("skipping draft %s (%dbytes)\n", file.Source, len(file.Body))
+
 			continue
 		}
+
 		tree.Files = append(tree.Files, file)
 	}
 
 	// call proc and pipe content through it, catch output of proc
 	for i, file := range tree.Files {
 		buf := bytes.NewReader(file.Body)
-		out := pipe(pipecmd, buf)
+
+		out, err := pipe(pipecmd, buf)
+		if err != nil {
+			log.Fatalf("pipe command '%v' failed with %v", pipecmd, err)
+		}
 
 		// write to source
 		tree.Files[i].NewBody = out
@@ -133,8 +140,8 @@ func main() {
 		if err != nil {
 			log.Fatalf("cannot write file %s, error: %v", fullpath, err)
 		}
-		newfile.Close()
 
+		newfile.Close()
 		fmt.Printf("written %s (%dbytes)\n", fullpath, n)
 	}
 
@@ -145,21 +152,21 @@ func main() {
 
 	// aggregate sections and section entries
 	sections := make(map[string]*Section)
+
 	for _, file := range tree.Files {
 		// not a section
 		if file.Parent == "." {
 			continue
 		}
+
 		name := file.Parent
 		sectionFile := filepath.Join(destination, file.Parent, "index."+ext)
 
-		//fmt.Printf("section %v\n", sectionFile)
 		link := file.Destination
 		if uglyURLs {
 			link += "." + ext
 		}
 
-		//fmt.Printf("link %v\n", link)
 		if _, ok := sections[name]; !ok {
 			sections[name] = &Section{File: sectionFile}
 		}
@@ -175,57 +182,24 @@ func main() {
 	for name, section := range sections {
 		// TODO: come up with sth better as one might have content there.
 		os.Remove(section.File)
-		section.Write(section.File)
+
+		err := section.Write(section.File)
+		if err != nil {
+			log.Fatalf("cannot write file %s, error: %v", section.File, err)
+		}
+
 		fmt.Printf("written section listing %s to %s\n", name, section.File)
 	}
 
 	section, ok := sections[seconOnRoot]
 	if ok {
 		sectionFile := filepath.Join(destination, "index."+ext)
-		section.Write(sectionFile)
+
+		err := section.Write(sectionFile)
+		if err != nil {
+			log.Fatalf("cannot append to file %s, error: %v", sectionFile, err)
+		}
+
 		fmt.Printf("written section listing for root to %s\n", section.File)
 	}
-}
-
-func pipe(cmd string, input io.Reader) []byte {
-	extpipe := exec.Command(cmd)
-	extpipe.Stdin = input
-
-	var pipeout bytes.Buffer
-	extpipe.Stdout = &pipeout
-
-	extpipe.Start()
-	extpipe.Wait()
-
-	return pipeout.Bytes()
-}
-
-func targetPath(dest, newext string, uglyURLs bool) (dir string, filename string) {
-	filename = "index." + newext
-	dir = dest
-
-	if uglyURLs && dest != "index" {
-		// make the last element in destination the file
-		filename = filepath.Base(dest) + "." + newext
-		// set the parent directory of that file to be the dir to create
-		dir = filepath.Dir(dest)
-	}
-
-	if dest == "index" {
-		dir = "."
-	}
-	return
-}
-
-func mkdir(dir string) (bool, error) {
-	// skip if this exists
-	if _, err := os.Stat(dir); err == nil {
-		return false, nil
-	}
-
-	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
-		return false, err
-	}
-
-	return true, nil
 }

@@ -27,6 +27,7 @@ func (section *Section) Write(file string) error {
 	})
 
 	var buf bytes.Buffer
+
 	for _, file := range section.List {
 		// TODO: this could be a template
 		entry := "\n"
@@ -38,9 +39,11 @@ func (section *Section) Write(file string) error {
 
 	f, err := os.OpenFile(file, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return err
+		return fmt.Errorf("open file: %w", err)
 	}
+
 	_, err = f.Write(buf.Bytes())
 	f.Close()
+
 	return err
 }

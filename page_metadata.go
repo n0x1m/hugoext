@@ -32,8 +32,8 @@ func dateFromInterface(input interface{}) time.Time {
 	str, ok := input.(string)
 	if !ok {
 		return time.Now()
-
 	}
+
 	t, err := time.Parse(time.RFC3339, str)
 	if err != nil {
 		// try just date, or give up
@@ -41,8 +41,10 @@ func dateFromInterface(input interface{}) time.Time {
 		if err != nil {
 			return time.Now()
 		}
+
 		return t
 	}
+
 	return t
 }
 
@@ -53,7 +55,9 @@ func stringArrayFromInterface(input interface{}) []string {
 		for _, str := range strarr {
 			out = append(out, stringFromInterface(str))
 		}
+
 		return out
 	}
+
 	return nil
 }
