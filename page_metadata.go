@@ -6,8 +6,8 @@ import (
 	"github.com/n0x1m/hugoext/hugo"
 )
 
-func NewContentFromMeta(meta map[string]interface{}) *hugo.Content {
-	return &hugo.Content{
+func NewContentFromMeta(meta map[string]interface{}) *hugo.PageMetadata {
+	return &hugo.PageMetadata{
 		Title:      stringFromInterface(meta["title"]),
 		Slug:       stringFromInterface(meta["slug"]),
 		Summary:    stringFromInterface(meta["summary"]),

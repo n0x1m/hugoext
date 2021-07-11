@@ -20,44 +20,46 @@ type File struct {
 	Parent      string
 	Name        string
 	Extension   string
+	Draft       bool
 
-	Draft bool
-
-	Body    []byte
-	NewBody []byte
+	Metadata hugo.PageMetadata
+	Body     []byte
+	NewBody  []byte
 }
 
-func parse(fullpath string) ([]byte, *hugo.Content, error) {
+func parsePage(fullpath string) (hugo.Page, error) {
 	file, err := os.Open(fullpath)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	defer file.Close()
 
 	page, err := hugo.ReadFrom(file)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
+	return page, nil
+}
+
+func parseMetadata(page hugo.Page) (*hugo.PageMetadata, error) {
 	meta, err := page.Metadata()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	c := NewContentFromMeta(meta)
-	body := page.FrontMatter()
-	body = append(body, '\n')
-	body = append(body, page.Content()...)
 
-	return body, c, nil
+	return c, nil
 }
 
 func destinationPath(file *File, pattern string) error {
-	body, c, err := parse(file.Source)
+	p, err := parsePage(file.Source)
 	if err != nil {
 		return err
 	}
+
+	// create content
+	c, err := parseMetadata(p)
 	c.Filepath = file.Name
-	file.Body = body
-	file.Draft = c.Draft
 
 	if file.Parent != "." {
 		link, err := hugo.PathPattern(pattern).Expand(c)
@@ -68,6 +70,10 @@ func destinationPath(file *File, pattern string) error {
 	} else {
 		file.Destination = strings.TrimLeft(file.Name, "_")
 	}
+
+	file.Draft = c.Draft
+	file.Metadata = *c
+	file.Body = p.Body()
 
 	return nil
 }

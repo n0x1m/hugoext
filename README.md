@@ -1,20 +1,21 @@
 # hugoext
 
-Utility to parse the hugo config file and create the same file structure for content through an
-arbitrary output pipe extension.
+Utility to parse the hugo config file and recreate the same file structure for content files through
+an arbitrary output pipe extension for processing.
 
 Hugo parses primarily markdown files and go templates. The initial motivation for this utility was
-to enable the same tools to publish a gemlog version of the same blog to make it accessible as
-gemtext via the Gemini protocol alongside the web html version.
+to enable the same tools to publish a Gemlog version of a hugo blog to make it accessible as Gemtext
+via the Gemini protocol.
 
-**NOTE**: this is minimal and only has one use case for now, many edge cases may not be covered.
+**NOTE**: this is rather minimal and only has one use case for now, many edge cases may not be covered.
 
 Features
 - reads hugo `.toml` file for section output formats
 - supports an arbitrary document processor, any program that supports UNIX pipes
 - ugly urls
 - section listings
-- with drafts
+- supports drafts
+- composable with other tools
 
 To illustrate what this program does, run the following in the hugo directory.
 
@@ -89,3 +90,11 @@ publish: build
 
 The output directory for both hugo and hugoext is `./public`. It's ok to mix the two into the same
 file tree as each directory will contain an `index.html` and an `index.gmi` file.
+
+## Acknowledgements & Attribution
+
+For config parsing and compatibility, this repo uses the latest hugo source tree as the functions are all
+exported. For markdown and metadata parsing of hugo content files, I've extracted some code from
+[hugo@v0.49.2](https://github.com/gohugoio/hugo/tree/v0.49.2/) tree and made them importable in the
+local [hugo](./hugo) package. The version had required frontmatter, metadata and section permalink
+parsers still available in well isolated functions, so I didn't need to recreate them.
