@@ -19,14 +19,13 @@ const (
 	defaultSource      = "content"
 	defaultDestination = "public"
 	defaultConfigPath  = "config.toml"
-	defaultUglyURLs    = false
 
 	defaultPermalinkFormat = "/:year/:month/:title/"
 )
 
 func main() {
 	var ext, pipe, source, destination, cfgPath string
-	var noSectionList, withDrafts bool
+	var noSectionList bool
 
 	flag.StringVar(&ext, "ext", defaultExt, "ext to look for templates in ./layout")
 	flag.StringVar(&pipe, "pipe", defaultProcessor, "pipe markdown to this program for content processing")
@@ -34,11 +33,10 @@ func main() {
 	flag.StringVar(&destination, "destination", defaultDestination, "output directory")
 	flag.StringVar(&cfgPath, "config", defaultConfigPath, "hugo config path")
 	flag.BoolVar(&noSectionList, "no-section-list", false, "disable auto append of section content lists")
-	flag.BoolVar(&withDrafts, "enable-withDrafts", false, "include withDrafts in processing and output")
 	flag.Parse()
 
 	// what are we doing
-	fmt.Printf("converting hugo markdown to %v with %v\n", ext, pipe)
+	fmt.Printf("hugoext: converting hugo markdown to %v with %v\n", ext, pipe)
 
 	// config
 	cfg, err := config.FromFile(afero.NewOsFs(), "config.toml")
@@ -49,6 +47,11 @@ func main() {
 	uglyURLs := cfg.GetBool("uglyURLs")
 	if !cfg.IsSet("uglyURLs") {
 		fmt.Println("config: no uglyURLs set, using default: ", uglyURLs)
+	}
+
+	buildDrafts := cfg.GetBool("buildDrafts")
+	if !cfg.IsSet("buildDrafts") {
+		fmt.Println("config: no buildDrafts set, using default: ", buildDrafts)
 	}
 
 	permalinks := cfg.GetStringMapString("permalinks")
@@ -80,7 +83,7 @@ func main() {
 			continue
 		}
 		//fmt.Printf("%s -> %s (%d)\n", file.Source, file.Destination, len(file.Body))
-		if file.Draft && !withDrafts {
+		if file.Draft && !buildDrafts {
 			fmt.Printf("skipping draft %s (%dbytes)\n", file.Source, len(file.Body))
 			continue
 		}
