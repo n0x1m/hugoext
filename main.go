@@ -148,6 +148,7 @@ func main() {
 
 	for name, section := range sections {
 		// TODO: come up with sth better as one might have content there.
+		fmt.Printf("clearing section %s file %s\n", name, section.File)
 		os.Remove(section.File)
 
 		err := section.Write(section.File)

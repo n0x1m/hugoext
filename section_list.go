@@ -23,7 +23,7 @@ type SectionEntry struct {
 func (section *Section) Write(file string) error {
 	// sort section list
 	sort.Slice(section.List, func(i, j int) bool {
-		return section.List[i].Date.Before(section.List[j].Date)
+		return section.List[i].Date.After(section.List[j].Date)
 	})
 
 	var buf bytes.Buffer
@@ -31,8 +31,8 @@ func (section *Section) Write(file string) error {
 	for _, file := range section.List {
 		// TODO: this could be a template
 		entry := "\n"
-		entry += fmt.Sprintf("=> %s %s\n", file.Link, file.Title)
-		entry += fmt.Sprintf("%v - %s\n", file.Date.Format("2006-01-02"), file.Summary)
+		entry += fmt.Sprintf("=> %s %v: %s\n", file.Link, file.Date.Format("2006-01-02"), file.Title)
+		entry += fmt.Sprintf("%s\n", file.Summary)
 
 		buf.Write([]byte(entry))
 	}
