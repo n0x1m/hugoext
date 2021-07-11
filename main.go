@@ -180,15 +180,11 @@ func main() {
 	section, ok := sections[seconOnRoot]
 	if ok {
 		sectionFile := filepath.Join(destination, "index."+ext)
+		// TODO: come up with sth better as one might have content there.
+		os.Remove(sectionFile)
 		section.Write(sectionFile)
 		fmt.Printf("written section listing for root to %s\n", section.File)
 	}
-
-	// TODO
-	// in watch mode, compare timestamps of files before replacement, keep index?
-	// check/replace links
-	// write rss?
-	// write listings from template?
 }
 
 func pipe(cmd string, input io.Reader) []byte {

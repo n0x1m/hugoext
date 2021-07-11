@@ -37,7 +37,6 @@ gemtext. Executed from the hugo directory:
 hugoext -ext gmi -pipe md2gmi
 ```
 
-
 It abides the hugo section config in `[permalinks]` but only uses the content subdirectory to
 determine the section. An example section config in hugo looks like this:
 
@@ -69,11 +68,12 @@ files. Here an example for a Gemlog using [gmifs](https://github.com/n0x1m/gmifs
 
 ```makefile
 serve:
-    hugoext -ext gmi -pipe md2gmi -serve="gmifs -autoindex"
+    hugoext -ext gmi -pipe md2gmi
+    gmifs -autoindex
 ```
 
-hugoext pipes the input through the `md2gmi` extension and spawns `gmifs` to serve the local gemini
-directory with auto indexing enabled.
+hugoext pipes the input through the `md2gmi` extension and writes the output file tree. We then
+spawn `gmifs` to serve it on `gemini://localhost` with auto indexing enabled.
 
 ### Production
 
