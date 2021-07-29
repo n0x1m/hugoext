@@ -1,3 +1,6 @@
+[![Go Report Card](https://goreportcard.com/badge/github.com/n0x1m/hugoext)](https://goreportcard.com/report/github.com/n0x1m/hugoext)
+[![GoDoc](https://godoc.org/github.com/n0x1m/hugoext?status.svg)](https://godoc.org/github.com/n0x1m/hugoext)
+
 # hugoext
 
 Utility to parse the hugo config file and recreate the same file structure for content files through
